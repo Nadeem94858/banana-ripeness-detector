@@ -1,5 +1,3 @@
 streamlit
-opencv-python # The Docker image will handle the build properly
 numpy
-pandas
-pillow
+scikit-image
