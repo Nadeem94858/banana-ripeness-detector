@@ -1,67 +1,87 @@
 import streamlit as st
-import cv2
 import numpy as np
-from banana_ripeness_detector import analyze_banana  # Import the analysis function
+from skimage import io, color
+import io as file_io # Required for reading the uploaded file bytes
 
-# --- Streamlit Setup ---
-st.set_page_config(layout="wide")
-st.title("🍌 Smart Banana Ripeness Detector")
-st.markdown("### Real-time Classification using Adaptive Color Analysis (HSV)")
+# --- CRITICAL DEPLOYMENT STEP ---
+# The logic below uses the scikit-image library, which handles image data 
+# as NumPy arrays and performs color conversion without the complex 
+# system dependencies required by OpenCV (cv2).
 
-# --- Video Capture ---
-# Note: Streamlit doesn't natively handle live webcam feed for analysis easily.
-# For a quick demo, we'll let the user UPLOAD an image instead.
-# For a true live feed, you'd use a library like 'webrtc-streamlit'.
+# Function to analyze the color and determine ripeness
+def analyze_ripeness(image_array):
+    """
+    Analyzes the average Hue of the image to determine ripeness.
+    Note: scikit-image normalizes the Hue channel to a range of [0.0, 1.0].
+    """
+    
+    # 1. Convert the image array from RGB to HSV
+    # (skimage.color.rgb2hsv normalizes all channels (H, S, V) to 0.0 to 1.0)
+    img_hsv = color.rgb2hsv(image_array)
 
-st.sidebar.header("Upload Image")
-uploaded_file = st.sidebar.file_uploader(
-    "Upload a picture of your banana to analyze:",
-    type=['jpg', 'jpeg', 'png']
+    # 2. Extract the HUE channel (index 0)
+    hue_channel = img_hsv[:, :, 0]
+    
+    # Simple check: exclude black/white/gray areas (low Saturation and Value) 
+    # and only consider pixels above a certain brightness/saturation.
+    # We will simply calculate the mean of the whole image for this simplified app.
+    mean_hue = np.mean(hue_channel)
+
+    # 3. Ripeness Logic based on normalized Hue (0.0 to 1.0)
+    # These thresholds are a simplified approximation:
+    if mean_hue > 0.18:
+        # High normalized Hue (e.g., 0.20 to 0.35) is Green
+        ripeness = "Unripe 🟢"
+        color_code = "green"
+    elif mean_hue >= 0.10 and mean_hue <= 0.18:
+        # Medium normalized Hue (e.g., 0.10 to 0.18) is Yellow/Ripe
+        ripeness = "Perfectly Ripe! 🍌"
+        color_code = "yellow"
+    else:
+        # Low normalized Hue (e.g., 0.0 to 0.09) is Orange/Red/Brown (Overripe)
+        ripeness = "Overripe 🟤"
+        color_code = "red"
+
+    return ripeness, mean_hue, color_code
+
+# --- Streamlit App Layout ---
+st.title("🍌 Banana Ripeness Detector")
+
+st.write(
+    """
+    This application uses the **scikit-image** library to analyze the color of an 
+    uploaded image and estimate its ripeness based on the average Hue value.
+    """
 )
 
+uploaded_file = st.file_uploader("Upload an image of a banana:", type=["jpg", "jpeg", "png"])
+
 if uploaded_file is not None:
-    # Read the image file and convert it to an OpenCV format (BGR)
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    frame = cv2.imdecode(file_bytes, 1)
+    try:
+        # Read the uploaded file into an in-memory byte stream
+        bytes_data = uploaded_file.read()
+        
+        # Use scikit-image's io.imread to read the bytes directly into a NumPy array
+        # We specify plugin='imageio' to ensure broad format compatibility
+        image_array = io.imread(file_io.BytesIO(bytes_data), plugin='imageio')
+        
+        # Display the uploaded image
+        st.image(image_array, caption='Uploaded Banana Image', use_column_width=True)
+        st.write("")
+        
+        with st.spinner('Analyzing ripeness...'):
+            ripeness_result, mean_hue_value, color_code = analyze_ripeness(image_array)
+            
+            st.markdown(f"### Result: **<span style='color:{color_code};'>{ripeness_result}</span>**", unsafe_allow_html=True)
+            st.write(f"*(Mean Normalized Hue Value: {mean_hue_value:.4f})*")
 
-    # Resize for consistent processing
-    frame = cv2.resize(frame, (640, 480))
+            st.info(
+                "**Note:** The color logic is based on **scikit-image's normalized Hue scale (0.0 to 1.0)**, "
+                "which is why the threshold values are different from what you would use with OpenCV's 0-179 scale."
+            )
+            
+    except Exception as e:
+        st.error(f"An error occurred during image processing. Please check the image format. Error: {e}")
 
-    # --- Analysis ---
-    result, annotated_frame = analyze_banana(frame)
-
-    # Convert BGR to RGB for Streamlit display
-    annotated_frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-
-    # --- Display Results ---
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.subheader("Analyzed Image (Region of Interest: Center Box)")
-        st.image(annotated_frame_rgb, use_column_width=True)
-
-    with col2:
-        st.subheader("Ripeness Report")
-
-        if result is None:
-            st.error(
-                "⚠️ **No Banana Detected.** Please ensure the banana is clearly visible in the center of the image.")
-        else:
-            ripeness = result['ripeness']
-            harvest_days = result['harvest_days']
-
-            # Use Markdown for dramatic result
-            st.markdown(f"## **Ripeness: {ripeness}**")
-            st.markdown(f"### Estimated Harvest: **{harvest_days}**")
-
-            st.info(f"""
-            **Details:**
-            - Average Hue (H): `{result['avg_h']:.1f}`
-            - Average Saturation (S): `{result['avg_s']:.1f}`
-            - Average Value (V): `{result['avg_v']:.1f}`
-
-            *The color ranges are used to classify the stage, primarily focusing on the Hue (H) channel.*
-            """)
-
-else:
-    st.info("Upload an image to start the banana ripeness analysis!")
+st.markdown("---")
+st.markdown("⚠️ **Action Required:** For this code to work, you **must** update your `requirements.txt` file.")
