@@ -1,4 +1,5 @@
 streamlit
 numpy
-opencv
+opencv = 4.12.0.88	
+
 
