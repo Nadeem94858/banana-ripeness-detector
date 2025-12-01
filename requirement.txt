@@ -1,5 +1,5 @@
 streamlit
-opencv-python # Use the standard package name
+opencv-python # The Docker image will handle the build properly
 numpy
 pandas
 pillow
