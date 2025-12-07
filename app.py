@@ -5,7 +5,7 @@ from banana_ripeness_detector import analyze_banana  # Import the analysis funct
 
 # --- Streamlit Setup ---
 st.set_page_config(layout="wide")
-st.title("🍌 Smart Banana Ripeness Detector")
+st.title("🍌 Computer Vision-Based Fruit Ripeness And Harvest Time Prediction")
 st.markdown("### Real-time Classification using Adaptive Color Analysis (HSV)")
 
 # --- Video Capture ---
@@ -65,3 +65,4 @@ if uploaded_file is not None:
 
 else:
     st.info("Upload an image to start the banana ripeness analysis!")
+
